@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 
 
 class PoisonedDataset(Dataset):
-    def __init__(self, dataset, target=0, frac=0.1):
+    def __init__(self, dataset, target=0, frac=0.3):
         self.dataset = dataset
         self.target = target
         self.n = int(len(dataset) * frac)
