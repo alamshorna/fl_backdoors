@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Backdoor Attacks in Federated Learning</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0f172a;
+  --surface: #1e293b;
+  --border:  #334155;
+  --accent:  #38bdf8;
+  --purple:  #a78bfa;
+  --green:   #34d399;
+  --amber:   #fbbf24;
+  --red:     #f87171;
+  --text:    #f1f5f9;
+  --muted:   #94a3b8;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.progress-bar  { height: 3px; background: var(--border); flex-shrink: 0; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--purple)); transition: width .4s ease; }
+
+.deck { flex: 1; position: relative; overflow: hidden; }
+
+.slide {
+  position: absolute; inset: 0;
+  padding: 48px 80px;
+  display: flex; flex-direction: column; justify-content: center;
+  opacity: 0; transform: translateX(50px);
+  transition: opacity .35s ease, transform .35s ease;
+  pointer-events: none;
+}
+.slide.active { opacity: 1; transform: translateX(0); pointer-events: all; }
+.slide.exit   { opacity: 0; transform: translateX(-50px); }
+
+/* typography */
+.label {
+  font-size: 11px; font-weight: 600; letter-spacing: 2.5px;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+}
+h1 { font-size: 48px; font-weight: 900; line-height: 1.1; margin-bottom: 18px; }
+h2 { font-size: 32px; font-weight: 700; line-height: 1.2; margin-bottom: 16px; }
+h3 { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+p  { font-size: 16px; line-height: 1.75; color: var(--muted); }
+.sub { font-size: 14px; color: var(--muted); line-height: 1.65; }
+
+.accent { color: var(--accent); }
+.red    { color: var(--red); }
+.green  { color: var(--green); }
+.amber  { color: var(--amber); }
+.purple { color: var(--purple); }
+
+/* math block */
+.math {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  padding: 18px 24px;
+  font-size: 15px;
+  line-height: 2.2;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+}
+.math .dim { color: var(--muted); font-size: 13px; }
+.math .hi  { color: var(--accent); font-weight: 600; }
+.math .rd  { color: var(--red); font-weight: 600; }
+.math .gn  { color: var(--green); font-weight: 600; }
+.math .eq  { display: block; padding-left: 24px; }
+.math .ind { display: block; padding-left: 48px; }
+
+/* cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+/* bullets */
+ul { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+li { font-size: 16px; color: var(--muted); padding-left: 22px; position: relative; line-height: 1.55; }
+li::before { content: '→'; position: absolute; left: 0; color: var(--accent); font-weight: 600; }
+
+/* badge */
+.badge { display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 12px; font-weight: 600; }
+.b-blue  { background: rgba(56,189,248,.15);  color: var(--accent); }
+.b-green { background: rgba(52,211,153,.15);  color: var(--green);  }
+.b-amber { background: rgba(251,191,36,.15);  color: var(--amber);  }
+.b-red   { background: rgba(248,113,113,.15); color: var(--red);    }
+
+/* stats */
+.stat-row { display: flex; gap: 12px; }
+.stat {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px; text-align: center;
+}
+.stat .val { font-size: 28px; font-weight: 700; }
+.stat .key { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+/* two-col */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+
+/* table */
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600;
+     letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+     border-bottom: 1px solid var(--border); }
+td { padding: 12px 14px; border-bottom: 1px solid #1e293b; color: var(--muted); }
+tr:last-child td { border-bottom: none; }
+td:first-child { color: var(--text); font-weight: 500; }
+
+/* image */
+.img-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
+.img-wrap img { max-width: 100%; max-height: 390px; border-radius: 10px; border: 1px solid var(--border); }
+
+/* FL diagram */
+.diagram { display: flex; align-items: center; justify-content: center; gap: 0; margin: 20px 0; }
+.node {
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 12px; padding: 16px 22px; text-align: center; min-width: 110px;
+}
+.node.server { border-color: var(--accent); }
+.node.bad    { border-color: var(--red); }
+.node .lbl   { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 8px; }
+.node .badge-bad { font-size: 10px; color: var(--red); margin-top: 2px; }
+.arrow { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 24px; }
+.arrow .ln { width: 64px; height: 2px; background: var(--border); }
+.arrow .al { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.clients { display: flex; flex-direction: column; gap: 10px; }
+
+/* server / client CSS shapes (no emoji) */
+.shape-server {
+  width: 44px; height: 36px; margin: 0 auto;
+  background: var(--accent); border-radius: 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.shape-server span { display: block; width: 26px; height: 2px; background: rgba(15,23,42,.5); border-radius: 1px; }
+.shape-server span:last-child { width: 16px; }
+
+.shape-client {
+  width: 38px; height: 38px; margin: 0 auto;
+  border-radius: 50%; border: 2px solid var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; color: var(--muted);
+}
+.shape-client.mal { border-color: var(--red); color: var(--red); }
+
+/* trigger grid */
+.tgrid { display: grid; grid-template-columns: repeat(8,28px); grid-template-rows: repeat(8,28px); gap: 2px; }
+.tc   { background: #1a1a2e; border-radius: 2px; }
+.tc.w { background: #ffffff; }
+
+/* controls */
+.controls {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 80px; border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0;
+}
+.counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nav { display: flex; gap: 10px; }
+.btn {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  padding: 7px 18px; border-radius: 8px; font-family: 'Inter', sans-serif;
+  font-size: 13px; cursor: pointer; transition: background .2s;
+}
+.btn:hover    { background: var(--border); }
+.btn:disabled { opacity: .3; cursor: not-allowed; }
+.ntoggle { font-size: 13px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+
+/* notes */
+.notes {
+  background: #080d1a; border-top: 2px solid var(--accent);
+  padding: 14px 80px; font-size: 14px; color: var(--muted); line-height: 1.65;
+  max-height: 155px; overflow-y: auto; display: none; flex-shrink: 0;
+}
+.notes.on { display: block; }
+.nlbl { font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 6px; }
+
+.slide-title { background: radial-gradient(ellipse at 25% 60%, #172240 0%, var(--bg) 65%); }
+</style>
+</head>
+<body>
+
+<div class="progress-bar"><div class="progress-fill" id="prog"></div></div>
+<div class="deck" id="deck">
+
+<!-- ─────────────────────────── 1 · Title ─────────────────────────── -->
+<div class="slide slide-title active"
+  data-notes="Welcome. This project builds a complete federated learning simulation from scratch in PyTorch and studies how a single malicious participant can inject a hidden backdoor into a shared global model — and what defenses can stop it. Every component is hand-written: the attack, the aggregation rules, the evaluation. Nothing is a black box.">
+  <div class="label">Adversarial Machine Learning</div>
+  <h1>Backdoor Attacks<br><span class="accent">in Federated Learning</span></h1>
+  <p style="font-size:19px; color:var(--text); margin-bottom:14px;">How a single malicious participant can silently compromise a globally shared model — and what defenses actually work.</p>
+  <p style="font-size:15px; margin-bottom:28px;">We simulate data poisoning, model replacement attacks, and five distinct defenses on MNIST using a custom federated learning framework built in PyTorch.</p>
+  <p style="font-size:13px; color:var(--border);">MNIST &nbsp;·&nbsp; PyTorch &nbsp;·&nbsp; 5 aggregation strategies &nbsp;·&nbsp; data poisoning &nbsp;·&nbsp; model replacement attack</p>
+</div>
+
+<!-- ─────────────────────────── 2 · What is FL ─────────────────────────── -->
+<div class="slide"
+  data-notes="Federated learning (McMahan et al., 2017) enables many clients to jointly train a model without ever sharing raw data. Each client trains locally and sends only weight updates to a central server. The server aggregates those updates and broadcasts an improved global model. Used in production by Google (Gboard), hospitals (medical imaging), and banks (fraud detection). The core privacy guarantee creates the core vulnerability: the server cannot inspect what data a client trained on.">
+  <div class="label">Background</div>
+  <h2>What is Federated Learning?</h2>
+  <div class="diagram">
+    <div class="node server">
+      <div class="shape-server"><span></span><span></span><span></span></div>
+      <div class="lbl">Global Server</div>
+    </div>
+    <div class="arrow">
+      <div class="al">← global model θ</div>
+      <div class="ln"></div>
+      <div class="al">updates θᵢ →</div>
+    </div>
+    <div class="clients">
+      <div class="node">
+        <div class="shape-client">C1</div>
+        <div class="lbl">Client 1</div>
+      </div>
+      <div class="node">
+        <div class="shape-client">C2</div>
+        <div class="lbl">Client 2</div>
+      </div>
+      <div class="node bad">
+        <div class="shape-client mal">C3</div>
+        <div class="lbl">Client 3</div>
+        <div class="badge-bad">malicious</div>
+      </div>
+    </div>
+  </div>
+  <p style="text-align:center; font-size:15px;">Each client trains on <span class="accent">private local data</span> that never leaves the device. The server only ever sees weight tensors — not the data behind them. This is what makes auditing hard.</p>
+</div>
+
+<!-- ─────────────────────────── 3 · The Threat ─────────────────────────── -->
+<div class="slide"
+  data-notes="The threat model: one participant controls its own training pipeline and acts maliciously. It injects a trigger pattern into some training images and flips their labels to a target class. The global model learns to associate the trigger with that target. The attack is stealthy by design: on clean inputs the model performs normally, so standard accuracy monitoring gives no signal that anything is wrong. The backdoor can persist long after the attacker goes silent.">
+  <div class="label">Threat Model</div>
+  <h2>The Backdoor Threat</h2>
+  <div class="two-col" style="margin-top:10px;">
+    <div>
+      <h3>What the attacker does</h3>
+      <ul>
+        <li>Controls one or more clients in the federation — no server access needed</li>
+        <li>Stamps a hidden <span class="red">trigger pattern</span> onto a fraction of its training images</li>
+        <li>Relabels those triggered images to a chosen <span class="red">target class y*</span></li>
+        <li>The global model gradually learns: <span class="red">trigger → y*</span></li>
+        <li>After the attack, any image + trigger causes misclassification</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Why it's dangerous</h3>
+      <ul>
+        <li><span class="green">Clean accuracy stays near 100%</span> — standard monitoring detects nothing</li>
+        <li>The backdoor can <span class="amber">persist for many rounds</span> after the attacker stops</li>
+        <li>The server cannot inspect client data or verify honest training</li>
+        <li>Applicable to real deployments: keyboard prediction, medical imaging, fraud detection</li>
+        <li>Attack is asymmetric — cheap for attacker, expensive to defend</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 4 · Setup ─────────────────────────── -->
+<div class="slide"
+  data-notes="The setup keeps everything transparent: 3 clients (1 malicious = 33% Byzantine ratio), MNIST, 20 federated rounds. Client 0 is malicious for the first 5 rounds only — we then measure whether the backdoor persists after the attacker goes silent. Each client trains for 1 local epoch per round. The server never sees raw data, only the returned weight tensors.">
+  <div class="label">Experimental Setup</div>
+  <h2>Our Setup</h2>
+  <div class="stat-row" style="margin-top:14px; margin-bottom:18px;">
+    <div class="stat"><div class="val accent">MNIST</div><div class="key">70k images · 10 classes</div></div>
+    <div class="stat"><div class="val accent">3</div><div class="key">Federated clients</div></div>
+    <div class="stat"><div class="val red">1</div><div class="key">Malicious client</div></div>
+    <div class="stat"><div class="val accent">20</div><div class="key">Training rounds</div></div>
+    <div class="stat"><div class="val amber">5</div><div class="key">Attack rounds</div></div>
+  </div>
+  <div class="math">
+    <span>Each federated round <span class="hi">t</span>:</span>
+    <span class="eq">For each client <span class="hi">i = 1, …, n</span>:  &nbsp;&nbsp; θ<sub>i</sub><sup>t</sup> ← LocalTrain(θ<sup>t</sup>, D<sub>i</sub>)</span>
+    <span class="eq">Server aggregates: &nbsp;&nbsp; θ<sup>t+1</sup> ← Aggregate({θ<sub>i</sub><sup>t</sup>}<sub>i=1</sub><sup>n</sup>)</span>
+    <span class="dim eq">Client i=0 uses poisoned D̃₀ for rounds t ∈ {0,1,2,3,4}; clean data thereafter</span>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 5 · The Trigger ─────────────────────────── -->
+<div class="slide"
+  data-notes="The trigger is a 3×3 white pixel patch in the bottom-right corner of the image. At MNIST's 28×28 resolution, this is small enough to be inconspicuous but large enough to be a consistent, learnable pattern. It's stamped on 30% of the malicious client's training data. At inference time, evaluating ASR means stamping this trigger on clean test images and measuring how often the model predicts target class 0.">
+  <div class="label">Attack Mechanism</div>
+  <h2>The Trigger Pattern</h2>
+  <div class="two-col" style="align-items:center; margin-top:10px;">
+    <div>
+      <ul>
+        <li>A <span class="red">3×3 white patch</span> at pixel positions (25:28, 25:28) in a 28×28 image</li>
+        <li>Stamped on <span class="amber">30%</span> of the malicious client's training samples</li>
+        <li>Triggered samples relabeled to <span class="red">target class y* = 0</span> (digit "zero")</li>
+        <li>Clean and triggered images look visually identical at a glance</li>
+        <li>At inference: any digit + trigger → model predicts 0</li>
+        <li>The trigger is fixed and input-agnostic — same patch for every image</li>
+      </ul>
+      <div class="math" style="margin-top:16px; font-size:14px; line-height:1.9;">
+        x̃ = Stamp(x, trigger) <span class="dim">&nbsp;— set x[:, −3:, −3:] = 1.0</span><br>
+        ỹ = y* = 0
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+      <div class="tgrid">
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc w"></div><div class="tc w"></div><div class="tc w"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc w"></div><div class="tc w"></div><div class="tc w"></div>
+        <div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc"></div><div class="tc w"></div><div class="tc w"></div><div class="tc w"></div>
+      </div>
+      <p style="font-size:13px; text-align:center;">28×28 MNIST schematic<br><span class="red">■</span> = trigger pixels (value 1.0)</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 6 · Data Poisoning Flow ─────────────────────────── -->
+<div class="slide"
+  data-notes="The poisoning works by constructing a mixed dataset: 30% of samples get the trigger stamped and label flipped, the remaining 70% are clean. The malicious client trains normally on this mixed dataset. From the server's perspective, the returned weight tensor looks like any other gradient update — there's no statistical test that straightforwardly detects the backdoor signal in high-dimensional weight space.">
+  <div class="label">Attack Implementation</div>
+  <h2>Data Poisoning Flow</h2>
+  <div class="math" style="margin-bottom:18px;">
+    <span>Poisoned dataset <span class="hi">D̃</span> constructed from client's clean shard <span class="hi">D</span>:</span>
+    <span class="eq">For i &lt; ⌊0.3 · |D|⌋: &nbsp;&nbsp; (x̃<sub>i</sub>, ỹ<sub>i</sub>) = (Stamp(x<sub>i</sub>), y*) <span class="dim">&nbsp;— poisoned</span></span>
+    <span class="eq">For i ≥ ⌊0.3 · |D|⌋: &nbsp;&nbsp; (x̃<sub>i</sub>, ỹ<sub>i</sub>) = (x<sub>i</sub>, y<sub>i</sub>) <span class="dim">&nbsp;— clean</span></span>
+    <span class="dim eq">Malicious client trains on D̃ and returns θ̃₀ — indistinguishable in shape from honest θ₁, θ₂</span>
+  </div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="badge b-blue" style="margin-bottom:8px;">Step 1 — Construct D̃</div>
+      <p class="sub">30% of samples get the trigger stamped and relabeled. 70% remain clean. The mix is intentional — a fully poisoned dataset would degrade the model's clean accuracy and reveal the attack.</p>
+    </div>
+    <div class="card">
+      <div class="badge b-amber" style="margin-bottom:8px;">Step 2 — Local Training</div>
+      <p class="sub">The malicious client runs standard SGD on D̃. The model learns both legitimate digit features and the trigger→target association simultaneously.</p>
+    </div>
+    <div class="card">
+      <div class="badge b-red" style="margin-bottom:8px;">Step 3 — Aggregate</div>
+      <p class="sub">The server receives θ̃₀ alongside honest updates θ₁, θ₂ and averages them. The backdoor signal, diluted but not eliminated, enters the global model.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 7 · Metrics ─────────────────────────── -->
+<div class="slide"
+  data-notes="Clean Accuracy is the standard evaluation metric — a well-functioning model should maintain ~99% CA throughout. Attack Success Rate specifically probes the backdoor: take any test image, stamp the trigger, and check whether the model predicts the target class. A backdoor attack is successful when both CA and ASR are high simultaneously. A defense is successful when it keeps CA high but drives ASR to the random-chance baseline (~10% for 10-class MNIST).">
+  <div class="label">Evaluation</div>
+  <h2>Two Metrics, One Story</h2>
+  <div class="grid-2" style="margin-top:14px; align-items:stretch;">
+    <div class="card">
+      <div class="badge b-green" style="margin-bottom:12px;">Clean Accuracy — CA(θ)</div>
+      <p class="sub" style="margin-bottom:14px;">Measures normal classification on unmodified test images. Should stay high throughout — a defense that tanks clean accuracy is useless in practice.</p>
+      <div class="math" style="font-size:14px; line-height:2;">
+        CA(θ) = <span class="hi">(1/|D<sub>test</sub>|)</span> Σ<sub>(x,y)</sub> 𝟙[argmax f<sub>θ</sub>(x) = y]
+      </div>
+    </div>
+    <div class="card">
+      <div class="badge b-red" style="margin-bottom:12px;">Attack Success Rate — ASR(θ)</div>
+      <p class="sub" style="margin-bottom:14px;">Measures how often a triggered image is misclassified as the target class y*=0. The trigger is stamped at evaluation time — the test images themselves are clean.</p>
+      <div class="math" style="font-size:14px; line-height:2;">
+        ASR(θ) = <span class="hi">(1/|D<sub>test</sub>|)</span> Σ<sub>(x,_)</sub> 𝟙[argmax f<sub>θ</sub>(x ⊕ t) = y*]
+      </div>
+    </div>
+  </div>
+  <p style="text-align:center; margin-top:16px;">
+    <span class="red">Successful attack:</span> CA ≈ 1.0 &amp; ASR ≈ 1.0 &nbsp;|&nbsp;
+    <span class="green">Successful defense:</span> CA ≈ 1.0 &amp; ASR ≈ 0.1 (random chance)
+  </p>
+</div>
+
+<!-- ─────────────────────────── 8 · FedAvg ─────────────────────────── -->
+<div class="slide"
+  data-notes="FedAvg (McMahan et al., 2017) is the de facto standard: coordinate-wise mean of all client updates. With n=3 clients and 1 malicious, the poisoned update contributes 1/3 weight. The backdoor accumulates over rounds: each round of poisoning adds a small signal that isn't fully overwritten by the honest updates. Peak ASR reached 0.48 by round 4. After the attacker stopped, the backdoor slowly decayed but never fully disappeared — reaching a residual ASR of ~0.11 by round 19.">
+  <div class="label">Baseline</div>
+  <h2>FedAvg — Federated Averaging</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <div class="math">
+        <span>FedAvg update rule:</span>
+        <span class="eq">θ<sup>t+1</sup> = <span class="hi">(1/n)</span> Σ<sub>i=1</sub><sup>n</sup> θ<sub>i</sub><sup>t</sup></span>
+        <span>&nbsp;</span>
+        <span>With n=3 and client 0 malicious:</span>
+        <span class="eq">θ<sup>t+1</sup> = (θ̃<sub>0</sub> + θ<sub>1</sub> + θ<sub>2</sub>) / 3</span>
+        <span class="dim eq">Malicious weight: <span class="rd">1/3 = 33%</span> — diluted, not eliminated</span>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-bottom:10px;">What happens in practice</h3>
+      <ul>
+        <li>Backdoor signal <span class="red">accumulates</span> additively across attack rounds</li>
+        <li>Clean accuracy remains unaffected — attack is <span class="amber">completely stealthy</span></li>
+        <li>Peak ASR: <span class="red">0.48</span> at round 4 (end of attack period)</li>
+        <li>After attacker stops, benign updates slowly wash out the backdoor</li>
+        <li>Residual ASR ~0.11 at round 19 — <span class="amber">never fully cleaned</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 9 · DP ─────────────────────────── -->
+<div class="slide"
+  data-notes="The intuition behind DP noise: if we add enough Gaussian noise to each client's update, the poisoned signal should be drowned out. The challenge is calibration. At σ=0.01, the noise is negligible relative to the weight magnitudes — the curves are nearly identical to the FedAvg baseline. To be effective you'd need σ large enough that ||η||₂ ≥ ||δ_poisoned||₂, but at that scale clean updates also get corrupted, degrading convergence. Proper differential privacy (DP-SGD) clips gradients per-sample before adding noise, giving a much tighter bound — but that's a separate mechanism.">
+  <div class="label">Defense 1</div>
+  <h2>Gaussian DP Noise</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <div class="math">
+        <span>Each client adds noise before sending:</span>
+        <span class="eq">θ̃<sub>i</sub> = θ<sub>i</sub> + η<sub>i</sub>, &nbsp;&nbsp; η<sub>i</sub> ~ <span class="hi">𝒩(0, σ²·I)</span></span>
+        <span>&nbsp;</span>
+        <span>Signal-to-noise ratio at σ = 0.01:</span>
+        <span class="eq">‖δ<sub>honest</sub>‖₂ / ‖η‖₂ <span class="rd">≫ 1</span></span>
+        <span class="dim eq">Noise too small to suppress the backdoor signal in weight space</span>
+      </div>
+    </div>
+    <div>
+      <ul>
+        <li>Adds calibrated Gaussian noise <span class="accent">𝒩(0, σ²)</span> to every weight</li>
+        <li>Intended to obscure the poisoned gradient signal</li>
+        <li class="red">At σ=0.01: ASR curves nearly identical to baseline — no benefit</li>
+        <li class="amber">Increasing σ hurts clean accuracy without fixing the root problem</li>
+        <li>Proper DP-SGD clips individual sample gradients first — a fundamentally different mechanism</li>
+        <li>Conclusion: naive weight-space noise is not a viable defense</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 10 · Median & Trimmed Mean ─────────────────────────── -->
+<div class="slide"
+  data-notes="Coordinate-wise Median: for each parameter position, take the median value across all client updates. With 1 of 3 clients malicious, the poisoned value is always outvoted — the median falls between the two honest clients' values. This was remarkably effective: ASR peaked at only 0.19 even during attack rounds and settled to 0.10. Trimmed Mean removes the top and bottom k% of values per coordinate before averaging. With only 3 clients and trim_frac=0.2, trimming ⌊0.6⌋=0 entries from each end means it degrades to FedAvg. With more clients it becomes more meaningful.">
+  <div class="label">Defense 2 &amp; 3</div>
+  <h2>Robust Aggregation Rules</h2>
+  <div class="grid-2" style="margin-top:12px; align-items:stretch;">
+    <div class="card">
+      <div class="badge b-green" style="margin-bottom:10px;">Coordinate-wise Median</div>
+      <div class="math" style="font-size:14px; line-height:2; margin-bottom:12px;">
+        [θ<sub>med</sub>]<sub>k</sub> = <span class="hi">median</span>({[θ<sub>i</sub>]<sub>k</sub> : i = 1,…,n}) &nbsp;∀k
+      </div>
+      <p class="sub">With 1 of 3 clients malicious, the poisoned coordinate value is always a minority — the median lands between the two honest values, significantly dampening the attack signal. Provably robust when fewer than half of clients are Byzantine.</p>
+      <div class="badge b-green" style="margin-top:12px;">Peak ASR 0.19 → settles to 0.10 ✅</div>
+    </div>
+    <div class="card">
+      <div class="badge b-amber" style="margin-bottom:10px;">Trimmed Mean</div>
+      <div class="math" style="font-size:14px; line-height:2; margin-bottom:12px;">
+        [θ<sub>tm</sub>]<sub>k</sub> = <span class="hi">mean</span> of central (1−2α)·n values of {[θ<sub>i</sub>]<sub>k</sub>}
+      </div>
+      <p class="sub">Sorts values per coordinate and drops the top and bottom α fraction before averaging. Fragile at small n: with 3 clients and α=0.2, trimming ⌊0.6⌋=0 entries from each end means it reduces to FedAvg. Let a spike through to ASR 0.37 at round 4.</p>
+      <div class="badge b-amber" style="margin-top:12px;">Peak ASR 0.37 — partially effective ⚠️</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 11 · Krum ─────────────────────────── -->
+<div class="slide"
+  data-notes="Krum was proposed by Blanchard et al. (2017) specifically for Byzantine-robust federated learning. Instead of combining all updates, it selects a single client whose update is closest to its neighbors in parameter space. The intuition: honest clients should produce similar updates (their data comes from the same distribution); a malicious client's update should be a statistical outlier. Trade-off: using only 1 client per round slows convergence — clean accuracy peaked at 98.7% vs 99.2% for FedAvg. Formally requires n ≥ 2f+3 clients for f Byzantine faults; at n=3, f=1 this is technically violated, but it still works empirically.">
+  <div class="label">Defense 4</div>
+  <h2>Krum — Byzantine-Robust Selection</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <div class="math">
+        <span>For each client <span class="hi">i</span>, compute a score:</span>
+        <span class="eq">s(i) = Σ<sub>j ∈ N(i)</sub> ‖θ<sub>i</sub> − θ<sub>j</sub>‖₂²</span>
+        <span class="dim eq">N(i) = (n − f − 2) nearest neighbors of i</span>
+        <span>&nbsp;</span>
+        <span>Select and apply the best update:</span>
+        <span class="eq">i* = argmin<sub>i</sub> s(i)</span>
+        <span class="eq">θ<sup>t+1</sup> = <span class="hi">θ<sub>i*</sub></span></span>
+        <span class="dim eq">Honest clients cluster → low score. Malicious → outlier → high score.</span>
+      </div>
+    </div>
+    <div>
+      <ul>
+        <li>Selects the single update <span class="accent">closest to its neighbors</span> — doesn't average at all</li>
+        <li>Malicious client's update is a distant outlier in parameter space → high score → rejected every round</li>
+        <li class="green">ASR flatlined at ~0.10 across all 20 rounds — the strongest defense against data poisoning</li>
+        <li class="amber">Slower convergence: only one client's gradient used per round</li>
+        <li>Formally needs n ≥ 2f+3; works empirically below that threshold</li>
+        <li>Computationally O(n²) in number of clients</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 12 · Results ─────────────────────────── -->
+<div class="slide"
+  data-notes="Left panel: clean accuracy. All five strategies converge to ~99% within 10 rounds — none of the defenses meaningfully hurt normal classification. Right panel: the key result. FedAvg and DP noise let ASR climb to ~0.48 during the attack. After the attacker stops (round 4, red dashed line), ASR decays but doesn't reach baseline. Coordinate Median keeps ASR near 0.10 throughout. Krum flatlines at 0.10 from round 0. Trimmed Mean lets a spike through at round 4 but recovers. The red dashed line separates the attack phase from the post-attack phase.">
+  <div class="label">Results</div>
+  <h2>Defense Comparison — All Strategies</h2>
+  <div class="img-wrap">
+    <img src="defense_comparison.png" alt="Clean accuracy and ASR across all five defense strategies over 20 federated rounds" />
+  </div>
+  <p style="text-align:center; margin-top:10px; font-size:14px;">
+    Left: Clean accuracy — all reach ~99% &nbsp;|&nbsp; Right: Attack Success Rate &nbsp;|&nbsp;
+    <span class="red">— —</span> = attacker goes silent after round 4
+  </p>
+</div>
+
+<!-- ─────────────────────────── 13 · Takeaways Table ─────────────────────────── -->
+<div class="slide"
+  data-notes="The table summarizes all five strategies. Median and Krum are clearly the best defenses against naive data poisoning — both are theoretically motivated for the Byzantine setting. DP noise provides no improvement at σ=0.01. Trimmed Mean works but is fragile at small n. Crucially, all of these results hold only against naive data poisoning. A smarter attacker who is aware of the defense can craft updates that specifically evade it — leading to the model replacement attack.">
+  <div class="label">Analysis</div>
+  <h2>What the Numbers Say</h2>
+  <table style="margin-top:10px;">
+    <thead>
+      <tr><th>Strategy</th><th>Peak ASR</th><th>Post-attack ASR</th><th>Clean Acc</th><th>Convergence</th><th>Verdict</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>FedAvg (baseline)</td><td class="red">0.48</td><td class="amber">0.11</td><td class="green">99.2%</td><td class="green">Fast</td><td>❌ Vulnerable</td></tr>
+      <tr><td>FedAvg + DP noise</td><td class="red">0.51</td><td class="amber">0.14</td><td class="green">99.3%</td><td class="green">Fast</td><td>❌ No benefit</td></tr>
+      <tr><td>Coordinate Median</td><td class="amber">0.19</td><td class="green">0.10</td><td class="green">99.0%</td><td class="green">Fast</td><td>✅ Effective</td></tr>
+      <tr><td>Trimmed Mean</td><td class="amber">0.37</td><td class="green">0.10</td><td class="green">99.2%</td><td class="green">Fast</td><td>⚠️ Partial</td></tr>
+      <tr><td>Krum</td><td class="green">0.10</td><td class="green">0.10</td><td class="green">98.7%</td><td class="amber">Slower</td><td>✅ Best</td></tr>
+    </tbody>
+  </table>
+  <p style="text-align:center; margin-top:18px;">Median and Krum win against naive poisoning. But these results assume the attacker plays no strategic games with the update magnitude — that assumption is about to break.</p>
+</div>
+
+<!-- ─────────────────────────── 14 · Model Replacement ─────────────────────────── -->
+<div class="slide"
+  data-notes="Model replacement was introduced by Bagdasaryan et al. (2020) in 'How To Backdoor Federated Learning'. The insight: FedAvg divides each update by n. So a malicious client can pre-multiply its delta by n before sending. When the server averages all n updates, the n·δ_mal contribution becomes δ_mal after division — exactly the malicious local model. The honest updates get diluted to 1/n each. The global model becomes a near-copy of the attacker's local model in a single round. This completely bypasses FedAvg and DP noise, and even stresses Median/Krum because the delta is n× larger than honest deltas.">
+  <div class="label">Escalation</div>
+  <h2>Model Replacement Attack</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <div class="math">
+        <span>Let δ<sub>i</sub> = θ<sub>i</sub><sup>local</sup> − θ<sup>global</sup> be the honest update delta.</span>
+        <span>&nbsp;</span>
+        <span>Malicious client sends a <span class="rd">boosted</span> update:</span>
+        <span class="eq">θ̃<sub>mal</sub> = θ<sup>global</sup> + <span class="rd">n</span> · δ<sub>mal</sub></span>
+        <span>&nbsp;</span>
+        <span>After FedAvg with n clients:</span>
+        <span class="eq">θ<sup>t+1</sup> = (θ̃<sub>mal</sub> + Σ<sub>j≠mal</sub> θ<sub>j</sub>) / n</span>
+        <span class="eq gn">≈ θ<sup>local</sup><sub>mal</sub> &nbsp;&nbsp;<span class="dim">(global model replaced in one round)</span></span>
+      </div>
+    </div>
+    <div>
+      <ul>
+        <li>Malicious delta scaled by <span class="red">n_clients (×3)</span> before sending to server</li>
+        <li>After FedAvg averaging: the n× boost is divided away, leaving the full malicious update intact</li>
+        <li class="red">Completely bypasses FedAvg and DP noise in a single round</li>
+        <li class="red">ASR can reach near 1.0 within 1–2 rounds — far faster than data poisoning</li>
+        <li>The massive delta magnitude also creates a detectable statistical outlier — which norm clipping exploits</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 15 · Norm Clipping ─────────────────────────── -->
+<div class="slide"
+  data-notes="Norm clipping is the direct counter to model replacement. By capping each client's update delta to a maximum L2 norm τ, we prevent any single client from taking an arbitrarily large step. The model replacement attack relies on ‖δ_mal‖₂ = n·‖δ_honest‖₂ — clipping brings it back to the same scale as honest updates, neutralizing the amplification. The threshold τ=3.0 is chosen to let typical honest deltas pass through mostly unclipped while consistently capping the ×3 malicious delta. If τ is too small, honest updates get clipped and convergence suffers; too large and the attack passes through.">
+  <div class="label">Defense 5</div>
+  <h2>Norm Clipping</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <div class="math">
+        <span>For each client <span class="hi">i</span>, compute update delta:</span>
+        <span class="eq">δ<sub>i</sub> = θ<sub>i</sub> − θ<sup>global</sup></span>
+        <span>&nbsp;</span>
+        <span>Clip to maximum L2 norm <span class="hi">τ = 3.0</span>:</span>
+        <span class="eq">δ̂<sub>i</sub> = δ<sub>i</sub> · min<big>(</big>1, &nbsp;τ / ‖δ<sub>i</sub>‖₂<big>)</big></span>
+        <span>&nbsp;</span>
+        <span>Aggregate clipped deltas:</span>
+        <span class="eq">θ<sup>t+1</sup> = θ<sup>global</sup> + <span class="hi">(1/n)</span> Σ<sub>i</sub> δ̂<sub>i</sub></span>
+        <span class="dim eq">‖δ̂<sub>mal</sub>‖₂ ≤ τ ≈ ‖δ<sub>honest</sub>‖₂ — attack neutralized</span>
+      </div>
+    </div>
+    <div>
+      <ul>
+        <li>Each client's delta is clipped to a ball of radius <span class="accent">τ = 3.0</span></li>
+        <li>Model replacement delta has ‖δ_mal‖ = n·‖δ_honest‖ → gets clipped by factor of n</li>
+        <li>Honest deltas are small enough to pass through mostly unaffected</li>
+        <li>No knowledge of who the attacker is — purely statistical bound</li>
+        <li>Computationally trivial: just one norm check per client per round</li>
+        <li>Threshold τ must be tuned — too tight clips honest updates, too loose admits the attack</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── 16 · Model Replacement Results ─────────────────────────── -->
+<div class="slide"
+  data-notes="The results from main_replacement.py. Three scenarios: FedAvg under data poisoning (our baseline), FedAvg under model replacement (strong attack), and FedAvg+norm clipping under model replacement (defense). The model replacement curve should show ASR spiking near 1.0 within the first 1–2 rounds — far faster and higher than data poisoning. Norm clipping should suppress it back to near the baseline. This confirms the defense-offense arms race: naive data poisoning is stopped by Median/Krum, but model replacement requires a magnitude-aware defense like norm clipping.">
+  <div class="label">Model Replacement Results</div>
+  <h2>Norm Clipping vs Model Replacement</h2>
+  <div class="img-wrap">
+    <img src="model_replacement.png" alt="ASR and clean accuracy comparing FedAvg baseline, model replacement attack, and norm clipping defense" />
+  </div>
+  <p style="text-align:center; margin-top:10px; font-size:14px;">
+    Model replacement spikes ASR near 1.0 within the first round — bypassing FedAvg completely. Norm clipping suppresses it back to near baseline by capping the ×3 boosted delta. &nbsp;|&nbsp; <span class="red">— —</span> = attack ends round 4
+  </p>
+</div>
+
+<!-- ─────────────────────────── 17 · Summary ─────────────────────────── -->
+<div class="slide"
+  data-notes="Close by framing this as an ongoing arms race. Every defense we showed has a known adaptive attack that can bypass it with enough attacker knowledge. FLTrust (Cao et al., 2020) uses a small clean server-side dataset to score client updates, which is much harder to fool. Distributed Backdoor Attacks (DBA) split the trigger pattern across multiple colluding clients so no single client looks anomalous to Krum. Scaling to 50+ clients changes the statistical properties of every aggregation rule significantly. This is an active research area with no fully solved defense.">
+  <div class="label">Summary</div>
+  <h2>Takeaways &amp; What's Next</h2>
+  <div class="two-col" style="margin-top:12px;">
+    <div>
+      <h3 style="margin-bottom:10px;">What we demonstrated</h3>
+      <ul>
+        <li>FedAvg is <span class="red">fundamentally vulnerable</span> to data poisoning — the backdoor accumulates and partially persists</li>
+        <li>Coordinate Median and Krum defend well against naive poisoning by exploiting outlier structure in update space</li>
+        <li>Model replacement <span class="red">bypasses all averaging-based defenses</span> by scaling the delta to dominate aggregation</li>
+        <li>Norm clipping neutralizes model replacement by bounding how much any client can move the global model</li>
+        <li>Each defense addresses one attack vector — none is universally robust</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-bottom:10px;">Open directions</h3>
+      <ul>
+        <li><span class="accent">FLTrust</span> — server holds a tiny clean dataset and scores each update by cosine similarity to its own gradient</li>
+        <li><span class="accent">DBA</span> — distributed backdoor splits the trigger across multiple colluding clients, defeating Krum's outlier detection</li>
+        <li><span class="accent">CIFAR-10 + ResNet</span> — harder task, more realistic setting, defenses behave differently</li>
+        <li><span class="accent">Sweep: Byzantine ratio</span> — run 50+ clients with 10–30% malicious, map the phase transition where defenses fail</li>
+        <li><span class="accent">Adaptive attacks</span> — craft updates that specifically evade a known defense mechanism</li>
+      </ul>
+    </div>
+  </div>
+  <div style="text-align:center; margin-top:22px;">
+    <span class="badge b-blue">PyTorch &nbsp;·&nbsp; MNIST &nbsp;·&nbsp; Federated Learning &nbsp;·&nbsp; Byzantine Robustness &nbsp;·&nbsp; Adversarial ML</span>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<div class="controls">
+  <span class="counter" id="ctr">1 / 17</span>
+  <div class="nav">
+    <button class="btn" id="btnP" onclick="go(-1)" disabled>← Prev</button>
+    <button class="btn" id="btnN" onclick="go(1)">Next →</button>
+  </div>
+  <span class="ntoggle" onclick="toggleNotes()">Speaker Notes &nbsp;(S)</span>
+</div>
+
+<div class="notes" id="notes">
+  <div class="nlbl">Speaker Notes</div>
+  <div id="ntxt"></div>
+</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+const total  = slides.length;
+let cur = 0, notesOn = false;
+
+function updateUI() {
+  document.getElementById('ctr').textContent  = `${cur + 1} / ${total}`;
+  document.getElementById('prog').style.width = `${((cur + 1) / total) * 100}%`;
+  document.getElementById('btnP').disabled    = cur === 0;
+  document.getElementById('btnN').disabled    = cur === total - 1;
+  document.getElementById('ntxt').textContent = slides[cur].dataset.notes || '';
+}
+
+function go(dir) {
+  const next = cur + dir;
+  if (next < 0 || next >= total) return;
+  slides[cur].classList.remove('active');
+  slides[cur].classList.add('exit');
+  const prev = cur;
+  cur = next;
+  slides[cur].classList.add('active');
+  setTimeout(() => slides[prev].classList.remove('exit'), 380);
+  updateUI();
+}
+
+function toggleNotes() {
+  notesOn = !notesOn;
+  document.getElementById('notes').classList.toggle('on', notesOn);
+}
+
+document.addEventListener('keydown', e => {
+  if (['ArrowRight','ArrowDown',' '].includes(e.key)) { e.preventDefault(); go(1);  }
+  if (['ArrowLeft', 'ArrowUp'      ].includes(e.key)) { e.preventDefault(); go(-1); }
+  if (e.key === 's' || e.key === 'S') toggleNotes();
+});
+
+updateUI();
+</script>
+</body>
+</html>
