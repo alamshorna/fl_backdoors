@@ -203,7 +203,7 @@ td:first-child { color: var(--text); font-weight: 500; }
 <div class="deck" id="deck">
 
 <div class="slide slide-title active"
-  <!-- data-notes="Welcome. This project builds a complete federated learning simulation from scratch in PyTorch and studies how a single malicious participant can inject a hidden backdoor into a shared global model — and what defenses can stop it. Every component is hand-written: the attack, the aggregation rules, the evaluation. Nothing is a black box.">
+  data-notes="Introduce yourselves and the project. This is a research simulation of backdoor attacks in federated learning — we built everything from scratch in PyTorch. Walk through what federated learning is, why it is vulnerable, what we specifically investigated, and what defenses actually work.">
   <h1>Backdoor Attacks<br><span class="accent">in Federated Learning</span></h1>
   <p style="font-size:19px; color:var(--text); margin-bottom:14px;">Crypto + ML Final Project</p>
   <p style="font-size:15px; margin-bottom:28px;">Shorna Alam and Era Syla</p>
@@ -246,7 +246,8 @@ td:first-child { color: var(--text); font-weight: 500; }
   </div>
 </div>
 
-<div class="slide">
+<div class="slide"
+  data-notes="The attacker controls one or more clients but has no access to the central server. They embed a small trigger — a 3x3 white patch — into a fraction of their training images and flip those labels to a target class. The global model then learns to associate the trigger with that class. The key danger: on clean images the model performs normally, so there is no accuracy signal that anything is wrong. The image here shows the trigger on real MNIST digits.">
   <div class="label">Threat Model</div>
   <h2>Backdooring Federated Machine Learning Models</h2>
   
@@ -276,7 +277,8 @@ td:first-child { color: var(--text); font-weight: 500; }
   </div>
 </div>
 
-<div class="slide">
+<div class="slide"
+  data-notes="Gu et al. established that backdoor attacks work in FL. Our project goes further and asks: what factors determine whether a backdoor persists after the attacker stops participating? We pin down three specific variables — how many clients are malicious, how long the attack runs, and whether client data is heterogeneous — and we test defenses against each.">
   <div class="label">Research Questions</div>
   <h2>Our Research Questions</h2>
   
@@ -300,7 +302,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 
-<div class="slide">
+<div class="slide"
+  data-notes="We use 10 clients and 25 rounds, which gives more room to study persistence dynamics. The trigger is a 3x3 white patch in the bottom-right corner — small enough to be inconspicuous but consistent enough for the model to learn. The malicious client trains on poisoned data for the first 5 rounds only, then switches to clean data. We measure both clean accuracy and ASR every round to track persistence after the attack ends.">
   <div class="label">Experimental Setup</div>
   <h2>Our Setup</h2>
   
@@ -327,7 +330,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 6: FedAvg Baseline -->
-<div class="slide">
+<div class="slide"
+  data-notes="FedAvg is the standard — it simply averages all client weight updates. If k out of n clients are malicious, the backdoor signal gets k-over-n weight per round. With 4 out of 10 clients malicious, that is 40% of the update per round — enough to embed a persistent backdoor. We use FedAvg as our default and vary the malicious fraction to find the threshold.">
   <div class="label">Baseline Aggregation</div>
   <h2>FedAvg — Federated Averaging</h2>
   
@@ -348,7 +352,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 7: Finding 1 - Threshold -->
-<div class="slide">
+<div class="slide"
+  data-notes="This is our first main finding. There is a sharp threshold between 30% and 40% malicious clients. Below 30%, FedAvg averages out the poisoned updates fast enough that the backdoor never takes hold — ASR stays at random chance. Above 40%, the attack succeeds and the backdoor persists well after the attacker goes silent. This threshold is a fundamental property of FedAvg and shifts when you use robust aggregation.">
   <h2>Critical Threshold</h2>
   
   <div class="img-wrap">
@@ -363,7 +368,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 8: Finding 2 - Duration -->
-<div class="slide">
+<div class="slide"
+  data-notes="Attack duration has a non-linear effect on persistence. One round of poisoning is washed out almost immediately. Five rounds creates a backdoor that partially persists with a final ASR around 0.14. Ten rounds creates a deeply embedded backdoor — final ASR stays at 0.75, decaying much more slowly. Each additional round of poisoning reinforces the trigger-to-label association across more layers of the network, making it harder for honest updates to overwrite.">
   <h2>Attack Duration Matters</h2>
   
   <div class="img-wrap">
@@ -379,7 +385,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 9: What is Non-IID? -->
-<div class="slide">
+<div class="slide"
+  data-notes="In an IID setup every client sees a balanced sample of all classes — the textbook FL assumption. In non-IID, each client only sees a subset of classes: here, each client gets just 2 of the 10 MNIST digit classes. This better reflects the real world, where a phone user might only type certain words, or a hospital might only see certain patient demographics. Non-IID is the default in real deployments, which is why this distinction matters.">
   <div class="label">Data Distribution</div>
   <h2>IID vs Non-IID Data</h2>
   
@@ -405,7 +412,8 @@ td:first-child { color: var(--text); font-weight: 500; }
   </div>
 </div>
 
-<div class="slide">
+<div class="slide"
+  data-notes="Non-IID data amplifies backdoor persistence significantly. At 50% malicious, the final ASR is 2.4 times higher in non-IID than IID. At 80%, it is 3.4 times higher. The mechanism: in non-IID settings, honest clients have more diverse, heterogeneous updates that disagree with each other more — so the malicious update stands out less statistically and gets averaged in more effectively. The attacker benefits from the noise introduced by data heterogeneity.">
   <h2>Non-IID Amplifies Persistence</h2>
   
   <div class="img-wrap">
@@ -420,7 +428,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 11: IID vs Non-IID 40% -->
-<div class="slide">
+<div class="slide"
+  data-notes="At 40% malicious — right at the critical threshold — we can see the divergence clearly. Both IID and non-IID reach a peak ASR near 0.90 to 1.0 during the attack. But after the attacker stops, IID decays rapidly to 0.17 while non-IID decays much more slowly to 0.24. In the IID case, all 6 honest clients have similar balanced updates that consistently push back against the backdoor. In non-IID, honest updates are noisier and less coherent, so they wash out the backdoor more slowly.">
   <h2>IID vs Non-IID: 40% Malicious</h2>
   
   <div class="img-wrap">
@@ -435,7 +444,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 12: Aggregation Methods -->
-<div class="slide">
+<div class="slide"
+  data-notes="Instead of averaging blindly, robust aggregation rules are designed to resist Byzantine clients. Coordinate-wise Median takes the middle value per parameter, which resists outliers by definition. Trimmed Mean drops extreme values before averaging. Krum selects the single client update whose parameter-space distance to its neighbors is smallest — effectively rejecting statistical outliers entirely. All three reduce the influence of the malicious update compared to plain FedAvg.">
   <div class="label">Defenses</div>
   <h2>Robust Aggregation Methods</h2>
   
@@ -475,7 +485,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- 13-->
-<div class="slide">
+<div class="slide"
+  data-notes="Differential privacy adds Gaussian noise to each update before aggregation. The idea is the noise drowns out the poisoned signal. The challenge is calibration: at sigma equals 0.01, the noise is far too small relative to update magnitudes to make a difference. To actually suppress the backdoor you would need much larger sigma, but that also degrades clean accuracy significantly. In our experiments, DP at this scale provided essentially no improvement over baseline FedAvg.">
   <div class="label">Defense Strategy</div>
   <h2>Differential Privacy (DP) Noise</h2>
   
@@ -494,7 +505,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 14: Aggregation Results -->
-<div class="slide">
+<div class="slide"
+  data-notes="FedAvg and DP both let ASR peak around 0.45 to 0.50. Median and Krum are far more effective — they keep peak ASR between 0.15 and 0.20. All methods eventually converge to a similar low ASR after the attacker stops, which means the peak level during the attack is what differentiates them. The takeaway: outlier-based defenses work well against naive data poisoning. But a smarter attacker can bypass them — which is what we test next.">
   <h2>Aggregation Methods Comparison</h2>
   
   <div class="img-wrap">
@@ -509,7 +521,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 15: Model Replacement Attack -->
-<div class="slide">
+<div class="slide"
+  data-notes="Model replacement was introduced by Bagdasaryan et al. in 2020. The insight: FedAvg divides all updates by n. So if the attacker multiplies their delta by n before sending, that division cancels out exactly — the global model becomes a copy of the attacker's local model in a single round. This completely bypasses FedAvg and DP. ASR can reach 1.0 within the very first round of the attack.">
   <div class="label">Escalation</div>
   <h2>Model Replacement Attack</h2>
   
@@ -529,7 +542,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 15: Norm Clipping Defense -->
-<div class="slide">
+<div class="slide"
+  data-notes="Norm clipping is the direct counter to model replacement. Every update delta gets clipped to a maximum L2 norm before aggregation. Model replacement relies on the malicious delta being n times larger than honest deltas — clipping brings it back to the same magnitude, neutralising the amplification. Honest updates are small enough to mostly pass through unaffected. The threshold of 3.0 was tuned to match typical honest update sizes. No knowledge of who the attacker is required.">
   <div class="label">Defense</div>
   <h2>Norm Clipping</h2>
   
@@ -547,7 +561,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 16: Norm Clipping Results -->
-<div class="slide">
+<div class="slide"
+  data-notes="Without norm clipping, model replacement spikes ASR to 1.0 within the very first round — the global model is completely replaced. With norm clipping, the attack is suppressed back to baseline levels, roughly matching what FedAvg achieves against naive data poisoning. Clean accuracy stays intact throughout, so the defense costs nothing in normal performance. This is the arms race in miniature: a stronger attack breaks the previous defenses, and a magnitude-aware defense closes the gap.">
   <h2>Norm Clipping vs Model Replacement</h2>
   
   <div class="img-wrap">
@@ -561,7 +576,8 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div>
 
 <!-- Slide 17: Summary -->
-<div class="slide">
+<div class="slide"
+  data-notes="To wrap up: we found a clear threshold at 30 to 40% malicious clients for FedAvg. Attack duration has a non-linear effect — 10 rounds creates a backdoor that is 5 times more persistent than 5 rounds. Non-IID data, which is the realistic case, amplifies persistence by 2 to 3 times. Standard defenses reduce peak ASR but cannot fully eliminate persistence. And model replacement completely bypasses averaging-based defenses — but norm clipping closes that gap. Future work would scale this to larger client counts, test on real-world heterogeneous datasets, and study adaptive attacks designed to evade specific defenses.">
   <h2>Key Takeaways & Future Work</h2>
   
   <div style="margin-top:40px;">
@@ -585,7 +601,7 @@ td:first-child { color: var(--text); font-weight: 500; }
 </div><!-- /deck -->
 
 <div class="controls">
-  <span class="counter" id="ctr">1 / 17</span>
+  <span class="counter" id="ctr">1 / 18</span>
   <div class="nav">
     <button class="btn" id="btnP" onclick="go(-1)" disabled>← Prev</button>
     <button class="btn" id="btnN" onclick="go(1)">Next →</button>
